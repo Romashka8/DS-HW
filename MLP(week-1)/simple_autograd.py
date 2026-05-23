@@ -168,10 +168,11 @@ class Linear(Layer):
         self.output_size = output_size
         self.use_bias = bias
 
-        self.weight = np.random.randn(input_size, output_size)
+        limit = np.sqrt(6 / (input_size + output_size))
+        self.weight = np.random.uniform(-limit, limit, (input_size, output_size))
 
         if self.use_bias:
-            self.bias = np.random.randn(output_size)
+            self.bias = np.zeros(output_size)
         else:
             self.bias = None
 
@@ -277,10 +278,21 @@ class Sequential(Layer):
 
         grad = grad_output
         for layer in reversed(self.layers):
-            # TODO: Примените backward для текущего слоя
             grad = layer.backward(grad)
 
         return grad
+
+    def get_trainable_layers(self):
+        """
+        Вернем список обучаемых слоев
+        """
+        trainable_layers = []
+        for layer in self.layers:
+            if hasattr(layer, "update_weights"):
+                trainable_layers.append(layer)
+
+        return trainable_layers
+
 
     def train(self):
         """
@@ -468,7 +480,6 @@ class Adam:
             layer: слой с градиентами
             layer_id: уникальный идентификатор слоя
         """
-        self.t += 1
 
         if hasattr(layer, "grad_weight") and layer.grad_weight is not None:
             if f"{layer_id}_weight" not in self.m:
@@ -483,7 +494,7 @@ class Adam:
 
             # Обновим второй момент (RMSprop)
             self.v[f"{layer_id}_weight"] = (
-                self.beta2 * self.m[f"{layer_id}_weight"]
+                self.beta2 * self.v[f"{layer_id}_weight"]
                 + (1 - self.beta2) * (layer.grad_weight) ** 2
             )
 
@@ -533,6 +544,11 @@ class Adam:
             if hasattr(layer, "grad_beta"):
                 layer.grad_beta = None
 
+    def step(self):
+        """
+        для обновления t один раз за эпоху
+        """
+        self.t += 1
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Добавим функции потерь
@@ -555,6 +571,7 @@ class CrossEntropyLoss:
             значение функции потерь
         """
         self.predictions = predictions
+        targets = targets.astype(int).reshape(-1)
         self.targets = targets
 
         self.softmax_pred = softmax(self.predictions)
@@ -562,7 +579,7 @@ class CrossEntropyLoss:
         batch_size = self.predictions.shape[0]
 
         loss = -np.mean(
-            np.log(self.softmax_pred[np.arange(batch_size), targets]) + 1e-12
+            np.log(self.softmax_pred[np.arange(batch_size), targets] + 1e-12)
         )
 
         return loss
@@ -611,7 +628,7 @@ class MSELoss:
         Returns:
             градиент по предсказаниям
         """
-        grad = 2 * (self.predictions - self.targets) / len(self.targets)
+        grad = 2 * (self.predictions - self.targets) / self.predictions.size
 
         return grad
 
