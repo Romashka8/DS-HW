@@ -530,6 +530,51 @@ class Adam:
                 m_corrected_bias / (np.sqrt(v_corrected_bias) + self.eps)
             )
 
+        # Обновим параметры для BatchNorm-а
+        if hasattr(layer, "grad_gamma") and layer.grad_gamma is not None:
+            if f"{layer_id}_bias" not in self.m:
+                self.m[f"{layer_id}_gamma"] = np.zeros(layer.grad_gamma.shape)
+                self.v[f"{layer_id}_gamma"] = np.zeros(layer.grad_gamma.shape)
+
+            # Реализуем обновление gamma
+            self.m[f"{layer_id}_gamma"] = (
+                self.beta1 * self.m[f"{layer_id}_gamma"]
+                + (1 - self.beta1) * layer.grad_gamma
+            )
+            self.v[f"{layer_id}_gamma"] = (
+                self.beta2 * self.v[f"{layer_id}_gamma"]
+                + (1 - self.beta2) * (layer.grad_gamma) ** 2
+            )
+
+            m_corrected_gamma = self.m[f"{layer_id}_gamma"] / (1 - self.beta1**self.t)
+            v_corrected_gamma = self.v[f"{layer_id}_gamma"] / (1 - self.beta2**self.t)
+
+            layer.gamma = layer.gamma - self.learning_rate * (
+                m_corrected_gamma / (np.sqrt(v_corrected_gamma) + self.eps)
+            )
+
+        if hasattr(layer, "grad_beta") and layer.grad_beta is not None:
+            if f"{layer_id}_bias" not in self.m:
+                self.m[f"{layer_id}_beta"] = np.zeros(layer.grad_beta.shape)
+                self.v[f"{layer_id}_beta"] = np.zeros(layer.grad_beta.shape)
+
+            # Реализуем обновление beta
+            self.m[f"{layer_id}_beta"] = (
+                self.beta1 * self.m[f"{layer_id}_beta"]
+                + (1 - self.beta1) * layer.grad_beta
+            )
+            self.v[f"{layer_id}_beta"] = (
+                self.beta2 * self.v[f"{layer_id}_beta"]
+                + (1 - self.beta2) * (layer.grad_beta) ** 2
+            )
+
+            m_corrected_beta = self.m[f"{layer_id}_beta"] / (1 - self.beta1**self.t)
+            v_corrected_beta = self.v[f"{layer_id}_beta"] / (1 - self.beta2**self.t)
+
+            layer.beta = layer.beta - self.learning_rate * (
+                m_corrected_beta / (np.sqrt(v_corrected_beta) + self.eps)
+            )
+
     def zero_grad(self, layers):
         """
         Обнуление градиентов
