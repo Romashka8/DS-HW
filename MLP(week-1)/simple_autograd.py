@@ -445,3 +445,93 @@ class BatchNorm(Layer):
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Имплементация Adam(Adaptive momentum) оптимизатора для SGD
+
+
+class Adam:
+    def __init__(self, learning_rate=0.001, beta1=0.9, beta2=0.999, eps=1e-8):
+        self.learning_rate = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+
+        # Словари для хранения моментов для каждого слоя
+        self.m = {}  # first moment
+        self.v = {}  # second moment
+        self.t = 0  # time step
+
+    def update(self, layer, layer_id):
+        """
+        Обновление параметров слоя с помощью Adam
+
+        Args:
+            layer: слой с градиентами
+            layer_id: уникальный идентификатор слоя
+        """
+        self.t += 1
+
+        if hasattr(layer, "grad_weight") and layer.grad_weight is not None:
+            if f"{layer_id}_weight" not in self.m:
+                self.m[f"{layer_id}_weight"] = np.zeros(layer.grad_weight.shape)
+                self.v[f"{layer_id}_weight"] = np.zeros(layer.grad_weight.shape)
+
+            # Обновим первый момент (momentum)
+            self.m[f"{layer_id}_weight"] = (
+                self.beta1 * self.m[f"{layer_id}_weight"]
+                + (1 - self.beta1) * layer.grad_weight
+            )
+
+            # Обновим второй момент (RMSprop)
+            self.v[f"{layer_id}_weight"] = (
+                self.beta2 * self.m[f"{layer_id}_weight"]
+                + (1 - self.beta2) * (layer.grad_weight) ** 2
+            )
+
+            # Коррекция смещения
+            m_corrected = self.m[f"{layer_id}_weight"] / (1 - self.beta1**self.t)
+            v_corrected = self.v[f"{layer_id}_weight"] / (1 - self.beta2**self.t)
+
+            # Обновим веса
+            layer.weight = layer.weight - self.learning_rate * (
+                m_corrected / (np.sqrt(v_corrected) + self.eps)
+            )
+
+        # Обновим bias аналогично весам
+        if hasattr(layer, "grad_bias") and layer.grad_bias is not None:
+            if f"{layer_id}_bias" not in self.m:
+                self.m[f"{layer_id}_bias"] = np.zeros(layer.grad_bias.shape)
+                self.v[f"{layer_id}_bias"] = np.zeros(layer.grad_bias.shape)
+
+            # Реализуем обновление bias
+            self.m[f"{layer_id}_bias"] = (
+                self.beta1 * self.m[f"{layer_id}_bias"]
+                + (1 - self.beta1) * layer.grad_bias
+            )
+            self.v[f"{layer_id}_bias"] = (
+                self.beta2 * self.v[f"{layer_id}_bias"]
+                + (1 - self.beta2) * (layer.grad_bias) ** 2
+            )
+
+            m_corrected_bias = self.m[f"{layer_id}_bias"] / (1 - self.beta1**self.t)
+            v_corrected_bias = self.v[f"{layer_id}_bias"] / (1 - self.beta2**self.t)
+
+            layer.bias = layer.bias - self.learning_rate * (
+                m_corrected_bias / (np.sqrt(v_corrected_bias) + self.eps)
+            )
+
+    def zero_grad(self, layers):
+        """
+        Обнуление градиентов
+        """
+        for layer in layers:
+            if hasattr(layer, "grad_weight"):
+                layer.grad_weight = None
+            if hasattr(layer, "grad_bias"):
+                layer.grad_bias = None
+            if hasattr(layer, "grad_gamma"):
+                layer.grad_gamma = None
+            if hasattr(layer, "grad_beta"):
+                layer.grad_beta = None
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
