@@ -535,3 +535,102 @@ class Adam:
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Добавим функции потерь
+
+
+class CrossEntropyLoss:
+    def __init__(self):
+        self.predictions = None
+        self.targets = None
+
+    def forward(self, predictions, targets):
+        """
+        Вычисление Cross-Entropy Loss
+
+        Args:
+            predictions: предсказания модели (batch_size, num_classes)
+            targets: истинные метки класса (batch_size,)
+
+        Returns:
+            значение функции потерь
+        """
+        self.predictions = predictions
+        self.targets = targets
+
+        self.softmax_pred = softmax(self.predictions)
+
+        batch_size = self.predictions.shape[0]
+
+        loss = -np.mean(
+            np.log(self.softmax_pred[np.arange(batch_size), targets]) + 1e-12
+        )
+
+        return loss
+
+    def backward(self):
+        """
+        Вычисление градиента Cross-Entropy Loss
+
+        Returns:
+            градиент по предсказаниям
+        """
+        batch_size = self.predictions.shape[0]
+        grad = self.softmax_pred.copy()
+        grad[np.arange(batch_size), self.targets] -= 1
+        grad /= batch_size
+        return grad
+
+
+class MSELoss:
+    def __init__(self):
+        self.predictions = None
+        self.targets = None
+
+    def forward(self, predictions, targets):
+        """
+        Вычисление Mean Squared Error
+
+        Args:
+            predictions: предсказания модели
+            targets: истинные значения
+
+        Returns:
+            значение функции потерь
+        """
+        self.predictions = predictions
+        self.targets = targets
+
+        loss = np.mean((self.predictions - self.targets) ** 2)
+
+        return loss
+
+    def backward(self):
+        """
+        Вычисление градиента MSE
+
+        Returns:
+            градиент по предсказаниям
+        """
+        grad = 2 * (self.predictions - self.targets) / len(self.targets)
+
+        return grad
+
+
+def softmax(x):
+    """
+    Устойчивая реализация softmax
+    """
+    x_shifted = x - np.max(x, axis=1, keepdims=True)
+    return np.exp(x_shifted) / np.sum(np.exp(x_shifted), axis=1, keepdims=True)
+
+
+def one_hot_encode(labels, num_classes):
+    """
+    Преобразование меток в one-hot кодировку
+    """
+    one_hot_matrix = np.zeros((len(labels), num_classes))
+    one_hot_matrix[np.arange(len(labels)), labels] = 1
+    return one_hot_matrix
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
